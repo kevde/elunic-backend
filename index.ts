@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const joi = require('joi');
+const _ = require('lodash');
 const app = express();
 const port = 3000;
 
@@ -44,8 +45,10 @@ function getUserByUsername(name: string): UserEntry | undefined {
 }
 
 function getUserByEmail(email: string): UserEntry | undefined {
-  // TODO
-  return undefined;
+  const matchedUser = _.find(MEMORY_DB, (user) => {
+    return user.email === email;
+  })
+  return matchedUser || undefined;
 }
 
 // Request body -> UserDto
@@ -65,6 +68,12 @@ app.get('/register', async (req: Request, res: Response) => {
   });
   try {
     const validatedUser: UserDto = await schema.validate(req.body);
+    const matchedUser = getUserByEmail(validatedUser.email);
+
+    if (matchedUser) {
+      throw new Error('User already exists')
+    }
+
     const salt = await bcrypt.genSalt(saltRounds);
     const hash = await bcrypt.hash(validatedUser.password, salt);
 
