@@ -45,7 +45,7 @@ function getUserByUsername(name: string): UserEntry | undefined {
 }
 
 function getUserByEmail(email: string): UserEntry | undefined {
-  const matchedUser = _.find(MEMORY_DB, (user) => {
+  const matchedUser = _.find(MEMORY_DB, (user: UserEntry) => {
     return user.email === email;
   })
   return matchedUser || undefined;
