@@ -7,13 +7,15 @@ const port = 3000;
 
 import { Request, Response } from 'express';
 
-const saltRounds = '10';
+app.use(express.json())
+
+const saltRounds = 10;
 
 interface UserDto {
   username: string;
   email: string;
   type: 'user' | 'admin';
-  password: string;
+  password?: string;
 }
 
 interface UserEntry {
@@ -52,7 +54,7 @@ function getUserByEmail(email: string): UserEntry | undefined {
 }
 
 // Request body -> UserDto
-app.get('/register', async (req: Request, res: Response) => {
+app.get('/register', async (req: Request<UserDto>, res: Response) => {
   const schema = joi.object({
     username: joi.string().alphanum().min(3).max(24).required(),
     email: joi.string().email().required(),
@@ -64,13 +66,15 @@ app.get('/register', async (req: Request, res: Response) => {
       .regex(/[ -~]*(?=[ -~])[^0-9a-zA-Z][ -~]*/) // basically: [ -~] && [^0-9a-zA-Z], at least 1 special character
       .min(5)
       .max(24)
-      .required(),
-  });
+      .required()
+      .error(new Error('Your password must at least have 1 uppercase, 1 lowercase and 1 special character')),
+  }).required();
   try {
-    const validatedUser: UserDto = await schema.validate(req.body);
-    const matchedUser = getUserByEmail(validatedUser.email);
+    const validatedUser = await schema.validateAsync(req.body || {});
+    const matchedInEmail = getUserByEmail(validatedUser.email);
+    const matchedInUsername = getUserByUsername(validatedUser.username);
 
-    if (matchedUser) {
+    if (matchedInEmail || matchedInUsername) {
       throw new Error('User already exists')
     }
 
@@ -80,10 +84,17 @@ app.get('/register', async (req: Request, res: Response) => {
     // set user
     MEMORY_DB[validatedUser.username] = {
       email: validatedUser.email,
-      type: 'user',
+      type: validatedUser.type || 'user',
       salt,
       passwordhash: hash,
     };
+
+    const responseUser: UserDto = {
+      username: validatedUser.username,
+      email: validatedUser.email,
+      type: validatedUser.type
+    }
+    res.status(200).send(responseUser)
   } catch (error) {
     res.status(400).send(error.message);
   }
@@ -100,7 +111,13 @@ app.post('/login', async (req: Request, res: Response) => {
     if (!isValid) {
       throw new Error('Password do not match');
     }
-    res.status(200).send(matchedUser);
+
+    const responseUser: UserDto = {
+      username: req.body.username,
+      email: matchedUser.email,
+      type: matchedUser.type
+    }
+    res.status(200).send(responseUser);
   } catch (error) {
     res.status(401).send(error.message);
   }
